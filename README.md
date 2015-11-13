@@ -1,0 +1,2 @@
+# MySIFT
+根据RobHess的opensift源码和OpenCV2.4.9的sift源码自己实现的sift算法

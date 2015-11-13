@@ -82,6 +82,7 @@ void BuildGaussianPyramid( const Mat& base, vector<Mat>& pyr,int nOctaves,int nO
 	}
 }
 
+//构建高斯差分金字塔
 void BuildDoGPyramid(vector<cv::Mat>& pyr,vector<cv::Mat>& dogpyr,int nOctaves,int nOctaveLayers)
 {
 	dogpyr.resize(nOctaves*(nOctaveLayers+2));
@@ -94,6 +95,74 @@ void BuildDoGPyramid(vector<cv::Mat>& pyr,vector<cv::Mat>& dogpyr,int nOctaves,i
 			const Mat& src1=pyr.at(o*(nOctaveLayers+3)+s);
 			const Mat& src2=pyr.at(o*(nOctaveLayers+3)+s+1);
 			subtract(src2,src1,dst,noArray(),CV_32FC1);
+		}
+	}
+}
+
+//判断是否是尺度空间的极值点
+bool IsExtrema(const std::vector<cv::Mat>& dogpyr,int idx,int r,int c)
+{
+	float val=dogpyr.at(idx).at<float>(r,c);
+	int i,j,k;
+	//判断是否最大值
+	if (val>0)
+	{
+		for (i=-1;i<=1;i++)
+		{
+			for (j=-1;j<=1;j++)
+			{
+				for(k=-1;k<=1;k++)
+				{
+					if (val<dogpyr.at(idx+k).at<float>(r+i,c+j))
+						return false;
+				}
+			}
+		}
+	}
+	else
+	{
+		//判断是否最小值
+		for (i=-1;i<=1;i++)
+		{
+			for (j=-1;j<=1;j++)
+			{
+				for(k=-1;k<=1;k++)
+				{
+					if (val>dogpyr.at(idx+k).at<float>(r+i,c+j))
+						return false;
+				}
+			}
+		}
+	}
+	return true;
+	
+}
+
+//找到尺度空间的极值点
+void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,int nOctaves,int nOctaveLayers,
+	float contrastThreshold,float edgeThreshold)
+{
+	//1.先找到初步的极值点
+	int o,s,idx,octRows,octCols,r,c;
+	float value;
+	for (o=0;o<nOctaves;o++)
+	{
+		for (s=1;s<=nOctaveLayers;s++)
+		{
+			idx=o*(nOctaveLayers+2)+s;
+			
+			octRows=dogpyr.at(o*nOctaveLayers).rows;
+			octCols=dogpyr.at(o*nOctaveLayers).cols;
+			for (r=SIFT_IMG_BORDER;r<octRows-SIFT_IMG_BORDER;r++)
+			{
+				for (c=SIFT_IMG_BORDER;c<octCols-SIFT_IMG_BORDER;c++)
+				{
+					value=dogpyr.at(idx).at<float>(r,c);
+					if (IsExtrema(dogpyr,idx,r,c)&&value>0)
+					{
+					}
+				}
+			}
 		}
 	}
 }

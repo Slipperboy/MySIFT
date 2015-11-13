@@ -1,5 +1,6 @@
 #include "AuxUtils.h"
 #include <sstream>
+#include <fstream>
 using namespace std;
 using namespace cv;
 
@@ -115,6 +116,36 @@ void writePyr(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
 				LinearStretch(mat,mat,min,max);
 			}
 			imwrite(oss.str(),mat);
+		}
+	}
+}
+
+//把金字塔图像的像素值保存，对图像不做任何操作
+void writePyrValue(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
+	const char *dir)
+{
+	ostringstream oss;
+	
+	
+	for (int o=0;o<nOctaves;o++)
+	{
+		for (int s=0;s<nOctaveLayers;s++)
+		{
+			oss.clear();
+			oss.str("");
+			oss<<dir<<"\\Octave"<<o<<"Layer"<<s<<".txt";
+			ofstream fout(oss.str().c_str());
+			const Mat &mat=pyr.at(o*nOctaveLayers+s);
+			for (int r=0;r<mat.rows;r++)
+			{
+				for (int c=0;c<mat.cols;c++)
+				{
+					float val=mat.at<float>(r,c);
+					fout<<val<<" ";
+				}
+				fout<<"\n";
+			}
+			fout.close();
 		}
 	}
 }

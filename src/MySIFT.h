@@ -63,7 +63,9 @@ void BuildGaussianPyramid( const cv::Mat& base, std::vector<cv::Mat>& pyr,
 
 void BuildDoGPyramid(std::vector<cv::Mat>& pyr,std::vector<cv::Mat>& dogpyr
 	,int nOctaves,int nOctaveLayers=3);
-}
 
+void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,int nOctaves,int nOctaveLayers=SIFT_INTVLS,
+	float contrastThreshold=SIFT_CONTR_THR,float edgeThreshold=SIFT_CURV_THR);
+}
 
 #endif

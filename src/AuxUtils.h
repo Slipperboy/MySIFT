@@ -8,4 +8,7 @@ void showPyr(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers=3+3);
 void writePyr(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
 	const char *dir,bool isStretch);
 
+void writePyrValue(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
+	const char *dir);
+
 #endif

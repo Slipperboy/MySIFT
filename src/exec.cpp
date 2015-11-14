@@ -17,6 +17,7 @@ int main(int argc,char** argv)
 	//showPyr(gaussianPyr,nOctaves,6);
 	//writePyr(gaussianPyr,nOctaves,6,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\gaussian");
 	//writePyr(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_nostretch",false);
-	writePyrValue(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_value");
+	//writePyrValue(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_value");
+	mysift::FindSpaceScaleExtrema(dogPyr,nOctaves);
 
 }

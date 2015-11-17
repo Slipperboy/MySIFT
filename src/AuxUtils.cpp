@@ -149,3 +149,41 @@ void writePyrValue(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers
 		}
 	}
 }
+
+const int draw_shift_bits = 4;
+const int draw_multiplier = 1 << draw_shift_bits;
+
+//»­Ô²
+void DrawCirlcle(cv::Mat& image,const vector<KeyPoint>& keypoints,const Scalar& color)
+{
+	RNG &rng=theRNG();
+	bool isRandColor=color==Scalar::all(-1);
+	vector<KeyPoint>::const_iterator cite=keypoints.begin();
+	for (;cite!=keypoints.end();cite++)
+	{
+		Scalar _color=isRandColor?Scalar(rng(256), rng(256), rng(256)):color;
+		Point center( cvRound((*cite).pt.x * draw_multiplier), cvRound((*cite).pt.y * draw_multiplier) );
+		int radius = cvRound((*cite).size/2 * draw_multiplier); 
+		circle(image,center,radius,_color,1,CV_AA,draw_shift_bits);
+	}
+}
+
+//»­½»²æÊ®×Ö
+void DrawCross(cv::Mat& image,const vector<KeyPoint>& keypoints,const Scalar& color)
+{
+	int halfLength=4;
+	RNG &rng=theRNG();
+	bool isRandColor=color==Scalar::all(-1);
+	vector<KeyPoint>::const_iterator cite=keypoints.begin();
+	for (;cite!=keypoints.end();cite++)
+	{
+		Scalar _color=isRandColor?Scalar(rng(256), rng(256), rng(256)):color;
+		Point right(cvRound(((*cite).pt.x+halfLength) * draw_multiplier), cvRound((*cite).pt.y * draw_multiplier));
+		Point left(cvRound(((*cite).pt.x-halfLength) * draw_multiplier), cvRound((*cite).pt.y * draw_multiplier));
+		Point up(cvRound((*cite).pt.x * draw_multiplier), cvRound(((*cite).pt.y+halfLength) * draw_multiplier));
+		Point down(cvRound((*cite).pt.x * draw_multiplier), cvRound(((*cite).pt.y-halfLength) * draw_multiplier));
+		line(image,up,down,_color,1,CV_AA,draw_shift_bits);
+		line(image,left,right,_color,1,CV_AA,draw_shift_bits);
+	}
+}
+

@@ -11,11 +11,6 @@ void writePyr(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
 void writePyrValue(const std::vector<cv::Mat> pyr,int nOctaves,int nOctaveLayers,
 	const char *dir);
 
-
-
-void DrawKeyPoints( const cv::Mat& image, const std::vector<cv::KeyPoint>& keypoints, cv::Mat& outImage,
-	const cv::Scalar& color=cv::Scalar::all(-1), int flags=cv::DrawMatchesFlags::DEFAULT);
-
 //»­Ô²
 void DrawCirlcle(cv::Mat& image,const std::vector<cv::KeyPoint>& keypoints,
 	const cv::Scalar& color=cv::Scalar::all(-1));

@@ -18,9 +18,9 @@ int main(int argc,char** argv)
 	//writePyr(gaussianPyr,nOctaves,6,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\gaussian");
 	//writePyr(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_nostretch",false);
 	//writePyrValue(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_value");
-	//vector<KeyPoint> keypoints;
-	//mysift::FindSpaceScaleExtrema(dogPyr,keypoints,nOctaves);
-	//mysift::AdjustByInitialImage(keypoints,firstOctave);
+	vector<KeyPoint> keypoints;
+	mysift::FindSpaceScaleExtrema(dogPyr,keypoints,nOctaves);
+	mysift::AdjustByInitialImage(keypoints,firstOctave);
 	//Mat drawImg;
 	//src.copyTo(drawImg);
 	//DrawKeyPoints(src,keypoints,drawImg,Scalar::all(-1),DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
@@ -29,11 +29,11 @@ int main(int argc,char** argv)
 	//waitKey(0);
 
 	//显示所有阶段的特征点
-	vector<KeyPoint> keypoints,interpKeypoints,finalKeypoints;
+	/*vector<KeyPoint> keypoints,interpKeypoints,finalKeypoints;
 	mysift::FindSpaceScaleExtrema(dogPyr,keypoints,interpKeypoints,finalKeypoints,nOctaves);
 	mysift::AdjustByInitialImage(keypoints,firstOctave);
 	mysift::AdjustByInitialImage(interpKeypoints,firstOctave);
-	mysift::AdjustByInitialImage(finalKeypoints,firstOctave);
+	mysift::AdjustByInitialImage(finalKeypoints,firstOctave);*/
 
 	//Mat imgInital,imgInterp,imgFinal;
 	//src.copyTo(imgInital);

@@ -14,7 +14,7 @@ bool EliminateEdegResponse(const vector<Mat>& dog_pyr, int octv,int nOctaveLayer
 	int r,int c,int layer,float edgeThreshold);
 
 float CaclulateContrast(const vector<Mat>& dog_pyr, int idx,
-	int r,int c,int layer,int xc,int xr,int xi);
+	int r,int c,int layer,float xc,float xr,float xi);
 
 void CreateInitialImage(const Mat &src,Mat &dst, bool doubleImageSize,double sigma)
 {
@@ -220,36 +220,10 @@ bool AdjustLocalExtrema(const vector<Mat>& dog_pyr, KeyPoint& kpt, int octv,
 
 	//2.计算极值，根据thr=constras/nOctaveLabeys消除不稳定极值点
 	int idx=octv*(nOctaveLayers+2)+layer;
-	const Mat &curr=dog_pyr.at(idx);
-	const Mat &prev=dog_pyr.at(idx-1);
-	const Mat &next=dog_pyr.at(idx+1);
-
-	//是否和Vec3f类型一致？
-	Matx31f dD((curr.at<float>(r,c+1)-curr.at<float>(r,c-1))*deriv_scale,
-		(curr.at<float>(r+1,c)-curr.at<float>(r-1,c))*deriv_scale,
-		(next.at<float>(r,c)-prev.at<float>(r,c))*deriv_scale);
-
-	float t= dD.dot(Matx31f(xc, xr, xi));
-	contr=curr.at<float>(r,c)*image_scale+0.5f*t;
-	/*int idx=octv*(nOctaveLayers+2)+layer;
-	contr=CaclulateContrast(dog_pyr,idx,r,c,layer,xc,xr,xi);*/
+	contr=CaclulateContrast(dog_pyr,idx,r,c,layer,xc,xr,xi);
 	if (std::abs(contr)*nOctaveLayers<contrastThreshold)
 		return false;
 	//3.消除边缘响应
-
-	/*	| Dxx  Dxy | 
-		| Dxy  Dyy |     */
-	//float dxx=(curr.at<float>(r,c+1)+curr.at<float>(r,c-1)-2*curr.at<float>(r,c))*second_deriv_scale;
-	//float dyy=(curr.at<float>(r+1,c)+curr.at<float>(r-1,c)-2*curr.at<float>(r,c))*second_deriv_scale;
-	//float dxy=(curr.at<float>(r+1,c+1)+curr.at<float>(r-1,c-1)
-	//	-curr.at<float>(r-1,c+1)-curr.at<float>(r+1,c-1))*corss_deriv_scale;
-
-	//float tr=dxx+dyy;
-	//float det=dxx*dyy-dxy*dxy;
-
-	////required: tr/det < (edge_thresh+1)^2/edge_thresh
-	//if (det <= 0||tr*edgeThreshold>=det*(edgeThreshold+1)*(edgeThreshold+1))
-	//	return false;
 	if (!EliminateEdegResponse(dog_pyr,octv,nOctaveLayers,r,c,layer,edgeThreshold))
 		return false;
 
@@ -269,6 +243,7 @@ bool AdjustLocalExtrema(const vector<Mat>& dog_pyr, KeyPoint& kpt, int octv,
 		}*/
 	//直径
 	kpt.size = sigma*powf(2.f, (layer + xi) / nOctaveLayers)*(1 << octv)*2;
+	kpt.response=std::abs(contr);
 	return true;
 }
 
@@ -302,7 +277,7 @@ void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint
 						if (!AdjustLocalExtrema(dogpyr,kpt,o,layer,r1,c1,
 							nOctaveLayers,SIFT_CONTR_THR,SIFT_CURV_THR,1.6f))
 							continue;
-						std::cout<<"找到特征点,o="<<o<<",s="<<s<<"r="<<r<<",c"<<c<<std::endl;
+						/*std::cout<<"找到特征点,o="<<o<<",s="<<s<<"r="<<r<<",c"<<c<<std::endl;*/
 						keypoints.push_back(kpt);
 					}
 				}

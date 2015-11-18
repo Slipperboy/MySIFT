@@ -19,4 +19,7 @@ void DrawCirlcle(cv::Mat& image,const std::vector<cv::KeyPoint>& keypoints,
 void DrawCross(cv::Mat& image,const std::vector<cv::KeyPoint>& keypoints,
 	const cv::Scalar& color=cv::Scalar::all(-1));
 
+//≤‚ ‘Ω«∂»º∆À„
+void TestAngle();
+
 #endif

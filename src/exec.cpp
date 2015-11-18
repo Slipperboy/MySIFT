@@ -5,6 +5,7 @@ using std::vector;
 
 int main(int argc,char** argv)
 {
+	TestAngle();
 	const char *filename="C:\\Users\\Dell\\Desktop\\assets\\lena.jpg";
 	Mat src=imread(filename);
 	Mat dst;
@@ -19,7 +20,8 @@ int main(int argc,char** argv)
 	//writePyr(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_nostretch",false);
 	//writePyrValue(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_value");
 	vector<KeyPoint> keypoints;
-	mysift::FindSpaceScaleExtrema(dogPyr,keypoints,nOctaves);
+	mysift::FindSpaceScaleExtrema(dogPyr,gaussianPyr,keypoints,nOctaves);
+	//mysift::findScaleSpaceExtremaCV(gaussianPyr,dogPyr,keypoints,nOctaves);
 	mysift::AdjustByInitialImage(keypoints,firstOctave);
 	//Mat drawImg;
 	//src.copyTo(drawImg);

@@ -56,7 +56,7 @@ const float SIFT_DESCR_MAG_THR = 0.2f;
 const float SIFT_INT_DESCR_FCTR = 512.f;
 
 //创建金字塔的第一层图像
-void CreateInitialImage(const cv::Mat &src,cv::Mat &dst, bool doubleImageSize,double sigma=SIFT_SIGMA);
+void CreateInitialImage(const cv::Mat &src,cv::Mat &dst, bool doubleImageSize,float sigma=SIFT_SIGMA);
 
 void BuildGaussianPyramid( const cv::Mat& base, std::vector<cv::Mat>& pyr,
 	int nOctaves,int nOctaveLayers=3 ,double sigma=SIFT_SIGMA);
@@ -64,8 +64,8 @@ void BuildGaussianPyramid( const cv::Mat& base, std::vector<cv::Mat>& pyr,
 void BuildDoGPyramid(std::vector<cv::Mat>& pyr,std::vector<cv::Mat>& dogpyr
 	,int nOctaves,int nOctaveLayers=3);
 
-void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint>& keypoints,
-	int nOctaves,int nOctaveLayers=SIFT_INTVLS,
+void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::Mat>& guasspyr,
+	std::vector<cv::KeyPoint>& keypoints,int nOctaves,int nOctaveLayers=SIFT_INTVLS,
 	float contrastThreshold=SIFT_CONTR_THR,float edgeThreshold=SIFT_CURV_THR);
 
 void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint>& initialKeypoints,
@@ -73,6 +73,17 @@ void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint
 	int nOctaveLayers=SIFT_INTVLS,float contrastThreshold=SIFT_CONTR_THR,float edgeThreshold=SIFT_CURV_THR);
 
 void AdjustByInitialImage(std::vector<cv::KeyPoint>& keypoints,int firstOctave);
+
+//OpenCV源码
+void createInitialImageCV( const cv::Mat& img,cv::Mat &dst, bool doubleImageSize, float sigma=SIFT_SIGMA );
+void buildDoGPyramidCV( const std::vector<cv::Mat>& gpyr, std::vector<cv::Mat>& dogpyr,
+int nOctaves,int nOctaveLayers=SIFT_INTVLS);
+void buildGaussianPyramidCV( const cv::Mat& base, std::vector<cv::Mat>& pyr, int nOctaves
+	,int nOctaveLayers=SIFT_INTVLS,float sigma=SIFT_SIGMA);
+
+void findScaleSpaceExtremaCV( const std::vector<cv::Mat>& gauss_pyr, const std::vector<cv::Mat>& dog_pyr,
+	std::vector<cv::KeyPoint>& keypoints,int nOctaves,int nOctaveLayers=SIFT_INTVLS,
+	float contrastThreshold=SIFT_CONTR_THR, float edgeThreshold=SIFT_CURV_THR, float sigma=SIFT_SIGMA );
 }
 
 #endif

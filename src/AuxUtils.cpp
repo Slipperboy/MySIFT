@@ -187,3 +187,17 @@ void DrawCross(cv::Mat& image,const vector<KeyPoint>& keypoints,const Scalar& co
 	}
 }
 
+void TestAngle()
+{
+	float a=fastAtan2(1.,std::sqrt(3.));
+	/*float srcAngleRad = p.angle*(float)CV_PI/180.f;
+	Point orient( cvRound(cos(srcAngleRad)*radius ),
+		cvRound(sin(srcAngleRad)*radius )
+		);
+	line( img, center, center+orient, color, 1, CV_AA, draw_shift_bits );*/
+	//图像坐标系与笛卡尔坐标系是与x轴对称的
+	float srcAngleRad = (360.f-a)*(float)CV_PI/180.f;
+	float x=cos(srcAngleRad);
+	float y=sin(srcAngleRad);
+}
+

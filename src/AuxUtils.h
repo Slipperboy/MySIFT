@@ -22,4 +22,10 @@ void DrawCross(cv::Mat& image,const std::vector<cv::KeyPoint>& keypoints,
 //测试角度计算
 void TestAngle();
 
+//比较两个特征点集是否完全相等
+void CompareKeypoints(const std::vector<cv::KeyPoint> kepoints1,const std::vector<cv::KeyPoint> kepoints2);
+
+//比较两个特征描述集是否完全相等
+bool CompareDescriptors(const cv::Mat descr1,const cv::Mat descr2);
+
 #endif

@@ -259,7 +259,7 @@ bool AdjustLocalExtrema(const vector<Mat>& dog_pyr, KeyPoint& kpt, int octv,
 	kpt.pt.x = (c + xc) * (1 << octv);
 	kpt.pt.y = (r + xr) * (1 << octv);
 	//下面这段代码的意义？
-	//kpt.octave = octv + (layer << 8) + (cvRound((xi + 0.5)*255) << 16);
+	kpt.octave = octv + (layer << 8) + (cvRound((xi + 0.5)*255) << 16);
 	//参考
 	/*if( firstOctave < 0 )
 		for( size_t i = 0; i < keypoints.size(); i++ )
@@ -564,9 +564,9 @@ void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint
 					{
 						//初始极值点
 						int r1=r,c1=c,layer=s;
-						initialKpt.pt.x=c*(1<<o);
-						initialKpt.pt.y=r*(1<<o);
-						initialKpt.size=1.f*powf(2.f, layer/ nOctaveLayers)*(1 << o)*2;
+						initialKpt.pt.x=(float)c*(1<<o);
+						initialKpt.pt.y=(float)r*(1<<o);
+						initialKpt.size=1.f*powf(2.f, (float)layer/ nOctaveLayers)*(1 << o)*2;
 						initialKeypoints.push_back(initialKpt);
 						if (!InterpExtrema(dogpyr,interpKpt,o,layer,r1,c1,
 							nOctaveLayers,SIFT_CONTR_THR,1.6f))
@@ -591,15 +591,246 @@ void AdjustByInitialImage(std::vector<cv::KeyPoint>& keypoints,int firstOctave)
 		{
 			KeyPoint& kpt = keypoints[i];
 			float scale = 1.f/(float)(1 << -firstOctave);
-			kpt.octave = (kpt.octave & ~255) | ((kpt.octave + firstOctave) & 255);
+			//kpt.octave = (kpt.octave & ~255) | ((kpt.octave + firstOctave) & 255);
+			int oct1 = (kpt.octave & ~255)+ ((kpt.octave + firstOctave) & 255);
+			int oct2 = (kpt.octave & ~255)|((kpt.octave + firstOctave) & 255);
+			if (oct1!=oct2)
+			{
+				std::cout<<"位运算错误";
+			}
+			kpt.octave = oct2;
 			kpt.pt *= scale;
 			kpt.size *= scale;
 		}
 }
 
+void UnpackKeypoint(const cv::KeyPoint& kpt,int &octave,int &layer,float &scale)
+{
+	/*kpt.pt.x = (c + xc) * (1 << octv);
+	kpt.pt.y = (r + xr) * (1 << octv);
+	--------|--------|--------
+	   xi     layer     octv
+	kpt.octave = octv + (layer << 8) + (cvRound((xi + 0.5)*255) << 16);
+	kpt.size = sigma*powf(2.f, (layer + xi) / nOctaveLayers)*(1 << octv)*2;
+	kpt.response=std::abs(contr);*/
+
+	octave = kpt.octave & 255;
+	layer = (kpt.octave >> 8) & 255;
+	octave = octave < 128 ? octave : (-128 | octave);
+	scale = octave >= 0 ? 1.f/(1 << octave) : (float)(1 << -octave);
+
+	//std::cout<<"octave:"<<octave<<",layer:"<<layer<<",scale:"<<scale<<std::endl;
+}
+
+void CaclSIFTDescriptor(const Mat &img,int r,int c,float ori,float scl_octv,int d,int bins,float *dst)
+{
+	float hist_width=SIFT_DESCR_SCL_FCTR*scl_octv;
+	//(3*sigma*(d+1)*(1.414/2))
+	int radius=cvRound(hist_width * 1.4142135623730951f * (d + 1) * 0.5f);
+	radius = std::min(radius, (int) sqrt((double) img.cols*img.cols + img.rows*img.rows));
+	float cos_t=cosf(ori*((float)CV_PI/180.f));
+	float sin_t=sinf(ori*((float)CV_PI/180.f));
+	int len=(2*radius+1)*(2*radius+1);
+	int histlen=(d+2)*(d+2)*(bins+2);
+	float exp_scale=-1.f/(2.f*d*0.5f*d*0.5f);
+	float bins_per_rad=bins/360.f;
+	AutoBuffer<float> buf(len*6+histlen);
+	float *X=buf,*Y= X+len,*Mag=X,*Ori=Y+len,*W=Ori+len,*RBin=W+len,*CBin=RBin+len;
+	float *tmp_hist=CBin+len;
+
+	int i,j,k;
+	int r1,c1;
+	float r_rot,c_rot,rbin,cbin;
+	for (i=0;i<histlen;i++)
+	{
+		tmp_hist[i]=0.f;
+	}
+
+	for (i=-radius,k=0;i<=radius;i++)
+	{
+		for (j=-radius;j<=radius;j++)
+		{
+			//坐标系方向和笛卡尔坐标系一致
+			c_rot=j*cos_t-i*sin_t;
+			r_rot=j*sin_t+i*cos_t;
+			rbin= 1.f/hist_width*r_rot+0.5f*d-0.5f;
+			cbin= 1.f/hist_width*c_rot+0.5f*d-0.5f;
+			r1=r+i;
+			c1=c+j;
+			//判断两个条件(如果该点经过旋转后在区域内，且该点不在图像的边缘，就计算这个点的梯度)
+			//1.该点经过坐标转换后在(2d+1)*(2d+1)的区域内
+			//2.该点不应该在图像边缘，否则无法计算梯度
+			if (rbin>-1&&rbin<d&&cbin>-1&&cbin<d&&
+				r1>0&&r1<img.rows-1&&c1>0&&c1<img.cols-1)
+			{
+				float dx=img.at<float>(r1,c1+1)-img.at<float>(r1,c1-1);
+				float dy=img.at<float>(r1-1,c1)-img.at<float>(r1+1,c1);
+				X[k]=dx;
+				Y[k]=dy;
+				W[i]=(r_rot*r_rot+c_rot*c_rot)*exp_scale;
+				//存储以特征点方向为X轴的(2d+1)*(2d+1)区域块的坐标
+				RBin[k]=rbin;
+				CBin[k]=cbin;
+				k++;
+			}
+		}
+	}
+
+	exp(W,W,k);
+	fastAtan2(Y,X,Ori,k,true);
+	magnitude(X,Y,Mag,k);
+
+	len=k;
+	//计算灰度梯度直方图
+	for (i=0;i<len;i++)
+	{
+		float rbin = RBin[i], cbin = CBin[i];
+		float obin = (Ori[i] - ori)*bins_per_rad;
+		float mag = Mag[i]*W[i];
+
+		int r0 = cvFloor( rbin );
+		int c0 = cvFloor( cbin );
+		int o0 = cvFloor( obin );
+		rbin -= r0;
+		cbin -= c0;
+		obin -= o0;
+
+		if( o0 < 0 )
+			o0 += bins;
+		if( o0 >= bins )
+			o0 -= bins;
+
+		// histogram update using tri-linear interpolation
+		float v_r1 = mag*rbin, v_r0 = mag - v_r1;
+		float v_rc11 = v_r1*cbin, v_rc10 = v_r1 - v_rc11;
+		float v_rc01 = v_r0*cbin, v_rc00 = v_r0 - v_rc01;
+		float v_rco111 = v_rc11*obin, v_rco110 = v_rc11 - v_rco111;
+		float v_rco101 = v_rc10*obin, v_rco100 = v_rc10 - v_rco101;
+		float v_rco011 = v_rc01*obin, v_rco010 = v_rc01 - v_rco011;
+		float v_rco001 = v_rc00*obin, v_rco000 = v_rc00 - v_rco001;
+
+		int idx = ((r0+1)*(d+2) + c0+1)*(bins+2) + o0;
+		tmp_hist[idx] += v_rco000;
+		tmp_hist[idx+1] += v_rco001;
+		tmp_hist[idx+(bins+2)] += v_rco010;
+		tmp_hist[idx+(bins+3)] += v_rco011;
+		tmp_hist[idx+(d+2)*(bins+2)] += v_rco100;
+		tmp_hist[idx+(d+2)*(bins+2)+1] += v_rco101;
+		tmp_hist[idx+(d+3)*(bins+2)] += v_rco110;
+		tmp_hist[idx+(d+3)*(bins+2)+1] += v_rco111;
+	}
+
+	// finalize histogram, since the orientation histograms are circular
+	for( i = 0; i < d; i++ )
+		for( j = 0; j < d; j++ )
+		{
+			int idx = ((i+1)*(d+2) + (j+1))*(bins+2);
+			tmp_hist[idx] += tmp_hist[idx+bins];
+			tmp_hist[idx+1] += tmp_hist[idx+bins+1];
+			if (tmp_hist[idx+bins+1]>FLT_EPSILON)
+			{
+				std::cout<<tmp_hist[idx+bins+1]<<std::endl;
+			}
+			for( k = 0; k < bins; k++ )
+				dst[(i*d + j)*bins + k] = tmp_hist[idx+k];
+		}
+
+	// copy histogram to the descriptor,
+	// apply hysteresis thresholding
+	// and scale the result, so that it can be easily converted
+	// to byte array
+	float nrm2 = 0;
+	len = d*d*bins;
+	for( k = 0; k < len; k++ )
+		nrm2 += dst[k]*dst[k];
+	float thr = std::sqrt(nrm2)*SIFT_DESCR_MAG_THR;
+	for( i = 0, nrm2 = 0; i < k; i++ )
+	{
+		float val = std::min(dst[i], thr);
+		dst[i] = val;
+		nrm2 += val*val;
+	}
+	nrm2 = SIFT_INT_DESCR_FCTR/std::max(std::sqrt(nrm2), FLT_EPSILON);
+
+	//为了更好的匹配，转化成uchar类型
+	for( k = 0; k < len; k++ )
+	{
+		dst[k] = saturate_cast<uchar>(dst[k]*nrm2);
+	}
+}
+
+//计算特征点的描述符
+void CalcDescritors(const std::vector<cv::Mat>& guasspyr,const std::vector<cv::KeyPoint>& keypoints,
+	cv::Mat descriptors,int firstOctave,int nOcatveLayers)
+{
+	//由于为了方便在图像上显示，一般特征点之前会根据初始图像有没有扩大来做一些调整
+	//所以需要根据调整后的特征点来重新计算组和层
+	int d = SIFT_DESCR_WIDTH, bins = SIFT_DESCR_HIST_BINS;
+	int descritorSize = d*d*bins;
+	descriptors.create((int)keypoints.size(),descritorSize,CV_32FC1);
+	int octv,layer,r,c;
+	float scale,scl_octv;
+	
+	for(size_t i=0;i<keypoints.size();i++)
+	{
+		const KeyPoint &kpt= keypoints.at(i);
+		UnpackKeypoint(kpt,octv,layer,scale);
+		scl_octv=kpt.size*scale*0.5f;
+		r=cvRound(kpt.pt.y*scale);
+		c=cvRound(kpt.pt.x*scale);
+		const Mat &img=guasspyr.at((octv-firstOctave)*(nOcatveLayers+3)+layer);
+		float angle = 360.f - kpt.angle;
+		if(std::abs(angle - 360.f) < FLT_EPSILON)
+			angle = 0.f;
+		CaclSIFTDescriptor(img,r,c,angle,scl_octv,d,bins,descriptors.ptr<float>((int)i));
+		//std::cout<<i<<std::endl;
+	}
+
+}
+
+void MySIFT(const cv::Mat img,std::vector<cv::KeyPoint>& keypoints,cv::Mat descriptors,
+	int nOctaveLayers,double contrastThreshold,float edgeThreshold,float sigma )
+{
+	Mat dst;
+	vector<Mat> gaussianPyr,dogPyr;
+	mysift::CreateInitialImage(img,dst,SIFT_IMG_DBL);
+	int firstOctave=SIFT_IMG_DBL?-1:0;
+	int nOctaves=(int)(log((double)std::min(img.cols,img.rows))/log(2.)-2-firstOctave);
+	mysift::BuildGaussianPyramid(dst,gaussianPyr,nOctaves);
+	mysift::BuildDoGPyramid(gaussianPyr,dogPyr,nOctaves);
+	//showPyr(gaussianPyr,nOctaves,6);
+	//writePyr(gaussianPyr,nOctaves,6,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\gaussian");
+	//writePyr(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_nostretch",false);
+	//writePyrValue(dogPyr,nOctaves,5,"C:\\Users\\Dell\\Desktop\\论文\\影像匹配研究\\sift图像结果\\dog_value");
+	mysift::FindSpaceScaleExtrema(dogPyr,gaussianPyr,keypoints,nOctaves);
+	mysift::AdjustByInitialImage(keypoints,firstOctave);
+	mysift::CalcDescritors(gaussianPyr,keypoints,descriptors,firstOctave);
+
+
+	//显示所有阶段的特征点
+	/*vector<KeyPoint> keypoints,interpKeypoints,finalKeypoints;
+	mysift::FindSpaceScaleExtrema(dogPyr,keypoints,interpKeypoints,finalKeypoints,nOctaves);
+	mysift::AdjustByInitialImage(keypoints,firstOctave);
+	mysift::AdjustByInitialImage(interpKeypoints,firstOctave);
+	mysift::AdjustByInitialImage(finalKeypoints,firstOctave);*/
+
+	//Mat imgInital,imgInterp,imgFinal;
+	//src.copyTo(imgInital);
+	//src.copyTo(imgInterp);
+	//src.copyTo(imgFinal);
+	//
+	//DrawCirlcle(imgInital,keypoints);
+	//DrawCirlcle(imgInterp,interpKeypoints);
+	//DrawCirlcle(imgFinal,finalKeypoints);
+
+	//imshow("initial",imgInital);
+	//imshow("interp",imgInterp);
+	//imshow("imgFinal",imgFinal);
+	//waitKey(0);
+}
+
 
 //OpenCV源码
-
 void createInitialImageCV( const Mat& img,Mat &dst, bool doubleImageSize, float sigma )
 {
 	Mat gray, gray_fpt;
@@ -950,5 +1181,246 @@ void findScaleSpaceExtremaCV( const vector<Mat>& gauss_pyr, const vector<Mat>& d
 		}
 }
 
+inline void unpackOctaveCV(const KeyPoint& kpt, int& octave, int& layer, float& scale)
+{
+	octave = kpt.octave & 255;
+	layer = (kpt.octave >> 8) & 255;
+	octave = octave < 128 ? octave : (-128 | octave);
+	scale = octave >= 0 ? 1.f/(1 << octave) : (float)(1 << -octave);
+}
+
+void calcSIFTDescriptorCV( const Mat& img, Point2f ptf, float ori, float scl,
+	int d, int n, float* dst )
+{
+	Point pt(cvRound(ptf.x), cvRound(ptf.y));
+	float cos_t = cosf(ori*(float)(CV_PI/180));
+	float sin_t = sinf(ori*(float)(CV_PI/180));
+	float bins_per_rad = n / 360.f;
+	float exp_scale = -1.f/(d * d * 0.5f);
+	float hist_width = SIFT_DESCR_SCL_FCTR * scl;
+	int radius = cvRound(hist_width * 1.4142135623730951f * (d + 1) * 0.5f);
+	// Clip the radius to the diagonal of the image to avoid autobuffer too large exception
+	radius = std::min(radius, (int) sqrt((double) img.cols*img.cols + img.rows*img.rows));
+	cos_t /= hist_width;
+	sin_t /= hist_width;
+
+	int i, j, k, len = (radius*2+1)*(radius*2+1), histlen = (d+2)*(d+2)*(n+2);
+	int rows = img.rows, cols = img.cols;
+
+	AutoBuffer<float> buf(len*6 + histlen);
+	float *X = buf, *Y = X + len, *Mag = Y, *Ori = Mag + len, *W = Ori + len;
+	float *RBin = W + len, *CBin = RBin + len, *hist = CBin + len;
+
+	for( i = 0; i < d+2; i++ )
+	{
+		for( j = 0; j < d+2; j++ )
+			for( k = 0; k < n+2; k++ )
+				hist[(i*(d+2) + j)*(n+2) + k] = 0.;
+	}
+
+	for( i = -radius, k = 0; i <= radius; i++ )
+		for( j = -radius; j <= radius; j++ )
+		{
+			// Calculate sample's histogram array coords rotated relative to ori.
+			// Subtract 0.5 so samples that fall e.g. in the center of row 1 (i.e.
+			// r_rot = 1.5) have full weight placed in row 1 after interpolation.
+			float c_rot = j * cos_t - i * sin_t;
+			float r_rot = j * sin_t + i * cos_t;
+			float rbin = r_rot + d/2 - 0.5f;
+			float cbin = c_rot + d/2 - 0.5f;
+			int r = pt.y + i, c = pt.x + j;
+
+			if( rbin > -1 && rbin < d && cbin > -1 && cbin < d &&
+				r > 0 && r < rows - 1 && c > 0 && c < cols - 1 )
+			{
+				float dx = (float)(img.at<float>(r, c+1) - img.at<float>(r, c-1));
+				float dy = (float)(img.at<float>(r-1, c) - img.at<float>(r+1, c));
+				X[k] = dx; Y[k] = dy; RBin[k] = rbin; CBin[k] = cbin;
+				W[k] = (c_rot * c_rot + r_rot * r_rot)*exp_scale;
+				k++;
+			}
+		}
+
+		len = k;
+		fastAtan2(Y, X, Ori, len, true);
+		magnitude(X, Y, Mag, len);
+		exp(W, W, len);
+
+		for( k = 0; k < len; k++ )
+		{
+			float rbin = RBin[k], cbin = CBin[k];
+			float obin = (Ori[k] - ori)*bins_per_rad;
+			float mag = Mag[k]*W[k];
+
+			int r0 = cvFloor( rbin );
+			int c0 = cvFloor( cbin );
+			int o0 = cvFloor( obin );
+			rbin -= r0;
+			cbin -= c0;
+			obin -= o0;
+
+			if( o0 < 0 )
+				o0 += n;
+			if( o0 >= n )
+				o0 -= n;
+
+			// histogram update using tri-linear interpolation
+			float v_r1 = mag*rbin, v_r0 = mag - v_r1;
+			float v_rc11 = v_r1*cbin, v_rc10 = v_r1 - v_rc11;
+			float v_rc01 = v_r0*cbin, v_rc00 = v_r0 - v_rc01;
+			float v_rco111 = v_rc11*obin, v_rco110 = v_rc11 - v_rco111;
+			float v_rco101 = v_rc10*obin, v_rco100 = v_rc10 - v_rco101;
+			float v_rco011 = v_rc01*obin, v_rco010 = v_rc01 - v_rco011;
+			float v_rco001 = v_rc00*obin, v_rco000 = v_rc00 - v_rco001;
+
+			int idx = ((r0+1)*(d+2) + c0+1)*(n+2) + o0;
+			hist[idx] += v_rco000;
+			hist[idx+1] += v_rco001;
+			hist[idx+(n+2)] += v_rco010;
+			hist[idx+(n+3)] += v_rco011;
+			hist[idx+(d+2)*(n+2)] += v_rco100;
+			hist[idx+(d+2)*(n+2)+1] += v_rco101;
+			hist[idx+(d+3)*(n+2)] += v_rco110;
+			hist[idx+(d+3)*(n+2)+1] += v_rco111;
+		}
+
+		// finalize histogram, since the orientation histograms are circular
+		for( i = 0; i < d; i++ )
+			for( j = 0; j < d; j++ )
+			{
+				int idx = ((i+1)*(d+2) + (j+1))*(n+2);
+				hist[idx] += hist[idx+n];
+				hist[idx+1] += hist[idx+n+1];
+				for( k = 0; k < n; k++ )
+					dst[(i*d + j)*n + k] = hist[idx+k];
+			}
+			// copy histogram to the descriptor,
+			// apply hysteresis thresholding
+			// and scale the result, so that it can be easily converted
+			// to byte array
+			float nrm2 = 0;
+			len = d*d*n;
+			for( k = 0; k < len; k++ )
+				nrm2 += dst[k]*dst[k];
+			float thr = std::sqrt(nrm2)*SIFT_DESCR_MAG_THR;
+			for( i = 0, nrm2 = 0; i < k; i++ )
+			{
+				float val = std::min(dst[i], thr);
+				dst[i] = val;
+				nrm2 += val*val;
+			}
+			nrm2 = SIFT_INT_DESCR_FCTR/std::max(std::sqrt(nrm2), FLT_EPSILON);
+
+#if 1
+			for( k = 0; k < len; k++ )
+			{
+				dst[k] = saturate_cast<uchar>(dst[k]*nrm2);
+			}
+#else
+			float nrm1 = 0;
+			for( k = 0; k < len; k++ )
+			{
+				dst[k] *= nrm2;
+				nrm1 += dst[k];
+			}
+			nrm1 = 1.f/std::max(nrm1, FLT_EPSILON);
+			for( k = 0; k < len; k++ )
+			{
+				dst[k] = std::sqrt(dst[k] * nrm1);//saturate_cast<uchar>(std::sqrt(dst[k] * nrm1)*SIFT_INT_DESCR_FCTR);
+			}
+#endif
+}
+
+void calcDescriptorsCV(const vector<Mat>& gpyr, const vector<KeyPoint>& keypoints,
+	Mat& descriptors,int nOctaveLayers, int firstOctave )
+{
+	int d = SIFT_DESCR_WIDTH, n = SIFT_DESCR_HIST_BINS;
+
+	for( size_t i = 0; i < keypoints.size(); i++ )
+	{
+		KeyPoint kpt = keypoints[i];
+		int octave, layer;
+		float scale;
+		unpackOctaveCV(kpt, octave, layer, scale);
+		CV_Assert(octave >= firstOctave && layer <= nOctaveLayers+2);
+		float size=kpt.size*scale;
+		Point2f ptf(kpt.pt.x*scale, kpt.pt.y*scale);
+		const Mat& img = gpyr[(octave - firstOctave)*(nOctaveLayers + 3) + layer];
+
+		float angle = 360.f - kpt.angle;
+		if(std::abs(angle - 360.f) < FLT_EPSILON)
+			angle = 0.f;
+		calcSIFTDescriptorCV(img, ptf, angle, size*0.5f, d, n, descriptors.ptr<float>((int)i));
+	
+	}
+}
+
+inline int descriptorSize()
+{
+	return SIFT_DESCR_WIDTH*SIFT_DESCR_WIDTH*SIFT_DESCR_HIST_BINS;
+}
+
+void siftCV(InputArray _image, InputArray _mask,vector<KeyPoint>& keypoints,OutputArray _descriptors,
+	int nfeatures,int nOctaveLayers,float contrastThreshold, float edgeThreshold,float sigma )
+{
+	int firstOctave = -1, actualNOctaves = 0, actualNLayers = 0;
+	Mat image = _image.getMat(), mask = _mask.getMat();
+
+	if( image.empty() || image.depth() != CV_8U )
+		CV_Error( CV_StsBadArg, "image is empty or has incorrect depth (!=CV_8U)" );
+
+	if( !mask.empty() && mask.type() != CV_8UC1 )
+		CV_Error( CV_StsBadArg, "mask has incorrect type (!=CV_8UC1)" );
+
+	Mat base;
+	createInitialImageCV(image, base,firstOctave < 0, sigma);
+	vector<Mat> gpyr, dogpyr;
+	int nOctaves = actualNOctaves > 0 ? actualNOctaves : cvRound(log( (double)std::min( base.cols, base.rows ) ) / log(2.) - 2) - firstOctave;
+
+	//double t, tf = getTickFrequency();
+	//t = (double)getTickCount();
+	buildGaussianPyramidCV(base, gpyr, nOctaves,nOctaveLayers,sigma);
+	buildDoGPyramidCV(gpyr, dogpyr,nOctaves,nOctaveLayers);
+
+	//t = (double)getTickCount() - t;
+	//printf("pyramid construction time: %g\n", t*1000./tf);
+
+
+	//t = (double)getTickCount();
+	findScaleSpaceExtremaCV(gpyr, dogpyr, keypoints,nOctaves,nOctaveLayers,
+		contrastThreshold,edgeThreshold,sigma);
+	KeyPointsFilter::removeDuplicated( keypoints );
+
+	if( nfeatures > 0 )
+		KeyPointsFilter::retainBest(keypoints, nfeatures);
+	//t = (double)getTickCount() - t;
+	//printf("keypoint detection time: %g\n", t*1000./tf);
+
+	if( firstOctave < 0 )
+		for( size_t i = 0; i < keypoints.size(); i++ )
+		{
+			KeyPoint& kpt = keypoints[i];
+			float scale = 1.f/(float)(1 << -firstOctave);
+			kpt.octave = (kpt.octave & ~255) | ((kpt.octave + firstOctave) & 255);
+			kpt.pt *= scale;
+			kpt.size *= scale;
+		}
+
+		if( !mask.empty() )
+			KeyPointsFilter::runByPixelsMask( keypoints, mask );
+	
+
+	if( _descriptors.needed() )
+	{
+		//t = (double)getTickCount();
+		int dsize = descriptorSize();
+		_descriptors.create((int)keypoints.size(), dsize, CV_32F);
+		Mat descriptors = _descriptors.getMat();
+
+		calcDescriptorsCV(gpyr, keypoints, descriptors, nOctaveLayers, firstOctave);
+		//t = (double)getTickCount() - t;
+		//printf("descriptor extraction time: %g\n", t*1000./tf);
+	}
+}
 
 }

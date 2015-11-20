@@ -1,6 +1,7 @@
 #include "AuxUtils.h"
 #include <sstream>
 #include <fstream>
+#include <algorithm>
 using namespace std;
 using namespace cv;
 
@@ -201,3 +202,44 @@ void TestAngle()
 	float y=sin(srcAngleRad);
 }
 
+bool CmpKpt(const KeyPoint& kp1,const KeyPoint& kp2)
+{
+	if( std::abs(kp1.pt.x -kp2.pt.x)<FLT_EPSILON &&std::abs(kp1.pt.y -kp2.pt.y)<FLT_EPSILON&&
+		std::abs(kp1.size -kp2.size)<FLT_EPSILON&&std::abs(kp1.angle-kp2.angle)<FLT_EPSILON&&
+		std::abs(kp1.response-kp2.response)<FLT_EPSILON&&kp1.octave == kp2.octave)
+		return true;
+	return false;
+}
+
+void CompareKeypoints(const std::vector<cv::KeyPoint> kepoints1,const std::vector<cv::KeyPoint> kepoints2)
+{
+	if (kepoints1.size()!=kepoints2.size())
+	{
+		std::cout<<"特征点个数不一致";
+		return;
+	}
+	vector<KeyPoint>::iterator ite;
+	bool isEq=equal(kepoints1.begin(),kepoints1.end(),kepoints2.begin(),CmpKpt);
+}
+
+bool DescrEqual(const float *descr1,const float *descr2,int n)
+{
+	for (int i=0;i<n;i++)
+	{
+		if (std::abs(descr1[i]-descr2[i])>=FLT_EPSILON)
+			return false;
+	}
+	return true;
+}
+
+//比较两个特征描述集是否完全相等
+bool CompareDescriptors(const cv::Mat descr1,const cv::Mat descr2)
+{
+	int r=descr1.rows;
+	for (int i=0;i<r;r++)
+	{
+		if (!DescrEqual(descr1.ptr<float>(i),descr2.ptr<float>(i),128))
+			return false;
+	}
+	return true;
+}

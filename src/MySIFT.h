@@ -74,6 +74,15 @@ void FindSpaceScaleExtrema(std::vector<cv::Mat>& dogpyr,std::vector<cv::KeyPoint
 
 void AdjustByInitialImage(std::vector<cv::KeyPoint>& keypoints,int firstOctave);
 
+void UnpackKeypoint(const cv::KeyPoint& kpt,int &oct,int &layer,float &scale);
+
+void CalcDescritors(const std::vector<cv::Mat>& guasspyr,const std::vector<cv::KeyPoint>& keypoints,
+	cv::Mat descriptors,int firstOctave,int nOcatveLayers=SIFT_INTVLS);
+
+void MySIFT(const cv::Mat img,std::vector<cv::KeyPoint>& keypoints,cv::Mat descriptors,
+	int nOctaveLayers=SIFT_INTVLS,double contrastThreshold=SIFT_CONTR_THR,
+	float edgeThreshold=SIFT_CURV_THR,float sigma=SIFT_SIGMA );
+
 //OpenCVÔ´Âë
 void createInitialImageCV( const cv::Mat& img,cv::Mat &dst, bool doubleImageSize, float sigma=SIFT_SIGMA );
 void buildDoGPyramidCV( const std::vector<cv::Mat>& gpyr, std::vector<cv::Mat>& dogpyr,
@@ -84,6 +93,11 @@ void buildGaussianPyramidCV( const cv::Mat& base, std::vector<cv::Mat>& pyr, int
 void findScaleSpaceExtremaCV( const std::vector<cv::Mat>& gauss_pyr, const std::vector<cv::Mat>& dog_pyr,
 	std::vector<cv::KeyPoint>& keypoints,int nOctaves,int nOctaveLayers=SIFT_INTVLS,
 	float contrastThreshold=SIFT_CONTR_THR, float edgeThreshold=SIFT_CURV_THR, float sigma=SIFT_SIGMA );
+
+void siftCV(cv::InputArray _image, cv::InputArray _mask,std::vector<cv::KeyPoint>& keypoints,
+	cv::OutputArray _descriptors,
+	int nfeatures,int nOctaveLayers=SIFT_INTVLS,float contrastThreshold=SIFT_CONTR_THR,
+	float edgeThreshold=SIFT_CURV_THR,float sigma=SIFT_SIGMA );
 }
 
 #endif
